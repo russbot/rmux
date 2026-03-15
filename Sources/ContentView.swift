@@ -8743,6 +8743,8 @@ private struct SidebarFooterButtons: View {
         HStack(spacing: 4) {
             SidebarHelpMenuButton(onSendFeedback: onSendFeedback)
             UpdatePill(model: updateViewModel)
+            Spacer()
+            SidebarWorktreeButton()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -10739,6 +10741,8 @@ private struct TabItemView: View, Equatable {
             }
         }
         .disabled(targetIds.isEmpty)
+
+        WorktreeContextMenuItems(workspace: tab)
 
         Divider()
 

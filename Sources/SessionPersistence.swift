@@ -339,6 +339,7 @@ struct SessionWorkspaceSnapshot: Codable, Sendable {
     var logEntries: [SessionLogEntrySnapshot]
     var progress: SessionProgressSnapshot?
     var gitBranch: SessionGitBranchSnapshot?
+    var worktreeMetadata: WorktreeMetadata?
 }
 
 struct SessionTabManagerSnapshot: Codable, Sendable {

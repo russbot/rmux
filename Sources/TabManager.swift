@@ -973,7 +973,8 @@ class TabManager: ObservableObject {
         select: Bool = true,
         eagerLoadTerminal: Bool = false,
         placementOverride: NewWorkspacePlacement? = nil,
-        autoWelcomeIfNeeded: Bool = true
+        autoWelcomeIfNeeded: Bool = true,
+        additionalEnvironment: [String: String] = [:]
     ) -> Workspace {
         // Snapshot current published state once so workspace creation doesn't repeatedly
         // bounce through Combine-backed accessors while we're preparing the new workspace.
@@ -989,7 +990,8 @@ class TabManager: ObservableObject {
             title: "Terminal \(nextTabCount)",
             workingDirectory: workingDirectory,
             portOrdinal: ordinal,
-            configTemplate: inheritedConfig
+            configTemplate: inheritedConfig,
+            additionalEnvironment: additionalEnvironment
         )
         newWorkspace.owningTabManager = self
         wireClosedBrowserTracking(for: newWorkspace)

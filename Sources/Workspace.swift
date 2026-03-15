@@ -162,7 +162,8 @@ extension Workspace {
             statusEntries: statusSnapshots,
             logEntries: logSnapshots,
             progress: progressSnapshot,
-            gitBranch: gitBranchSnapshot
+            gitBranch: gitBranchSnapshot,
+            worktreeMetadata: worktreeMetadata
         )
     }
 
@@ -210,6 +211,7 @@ extension Workspace {
         }
         progress = snapshot.progress.map { SidebarProgressState(value: $0.value, label: $0.label) }
         gitBranch = snapshot.gitBranch.map { SidebarGitBranchState(branch: $0.branch, isDirty: $0.isDirty) }
+        worktreeMetadata = snapshot.worktreeMetadata
 
         recomputeListeningPorts()
 
@@ -1131,7 +1133,8 @@ final class Workspace: Identifiable, ObservableObject {
         title: String = "Terminal",
         workingDirectory: String? = nil,
         portOrdinal: Int = 0,
-        configTemplate: ghostty_surface_config_s? = nil
+        configTemplate: ghostty_surface_config_s? = nil,
+        additionalEnvironment: [String: String] = [:]
     ) {
         self.id = UUID()
         self.portOrdinal = portOrdinal
@@ -1176,6 +1179,7 @@ final class Workspace: Identifiable, ObservableObject {
             context: GHOSTTY_SURFACE_CONTEXT_TAB,
             configTemplate: configTemplate,
             workingDirectory: hasWorkingDirectory ? trimmedWorkingDirectory : nil,
+            additionalEnvironment: additionalEnvironment,
             portOrdinal: portOrdinal
         )
         panels[terminalPanel.id] = terminalPanel
