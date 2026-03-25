@@ -100,10 +100,34 @@ enum GitWorktreeService {
         var args = ["worktree", "remove"]
         if force { args.append("--force") }
         args.append(path)
-        if runGitCommand(directory: repoRoot, arguments: args) != nil {
+
+        let process = Process()
+        let stderrPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["git", "-C", repoRoot] + args
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            return .failure(.gitFailed("Failed to launch git: \(error.localizedDescription)"))
+        }
+
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        if process.terminationStatus == 0 {
             return .success(())
         }
-        return .failure(.gitFailed("Failed to remove worktree at \(path)"))
+
+        let stderrMsg = String(data: stderrData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return .failure(.gitFailed(stderrMsg.isEmpty ? "Failed to remove worktree at \(path)" : stderrMsg))
+    }
+
+    /// Cleans up stale worktree tracking entries (e.g. from interrupted removals).
+    static func pruneWorktrees(repoRoot: String) {
+        let _ = runGitCommand(directory: repoRoot, arguments: ["worktree", "prune"])
     }
 
     // MARK: - Helpers

@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// Tracks worktree paths currently being removed so they stay hidden across panel reopens.
+/// Automatically clears paths whose directories no longer exist on disk.
+private enum PendingWorktreeRemovals {
+    private static var paths: Set<String> = []
+
+    static func add(_ path: String) { paths.insert(path) }
+    static func contains(_ path: String) -> Bool { paths.contains(path) }
+
+    /// Remove paths whose directories are already gone.
+    static func pruneCompleted() {
+        paths = paths.filter { FileManager.default.fileExists(atPath: $0) }
+    }
+}
+
 struct WorktreePickerView: View {
     @EnvironmentObject var tabManager: TabManager
     @Environment(\.dismiss) private var dismiss
@@ -42,7 +56,7 @@ struct WorktreePickerView: View {
 
     private var header: some View {
         HStack {
-            Text(String(localized: "worktree.picker.title", defaultValue: "Git Worktrees"))
+            Text("Git Worktrees")
                 .font(.headline)
             Spacer()
         }
@@ -76,12 +90,12 @@ struct WorktreePickerView: View {
 
     private var existingWorktreesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "worktree.picker.existing", defaultValue: "Existing Worktrees"))
+            Text("Existing Worktrees")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
 
             if worktrees.isEmpty {
-                Text(String(localized: "worktree.picker.noWorktrees", defaultValue: "No worktrees found"))
+                Text("No worktrees found")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else {
@@ -93,28 +107,42 @@ struct WorktreePickerView: View {
     }
 
     private func worktreeRow(_ entry: WorktreeEntry) -> some View {
-        Button {
-            openExistingWorktree(entry)
-        } label: {
-            HStack {
-                Image(systemName: "arrow.triangle.branch")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.branch ?? "detached")
-                        .font(.body)
-                        .lineLimit(1)
-                    Text(entry.path)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
+        HStack {
+            Button {
+                openExistingWorktree(entry)
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.branch ?? "detached")
+                            .font(.body)
+                            .lineLimit(1)
+                        Text(entry.path)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+
+            if !isMainWorktree(entry) {
+                Button {
+                    removeWorktree(entry)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Remove worktree")
+            }
         }
-        .buttonStyle(.plain)
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.05)))
@@ -122,7 +150,7 @@ struct WorktreePickerView: View {
 
     private var createNewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "worktree.picker.createNew", defaultValue: "Create New Worktree"))
+            Text("Create New Worktree")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
 
@@ -130,7 +158,7 @@ struct WorktreePickerView: View {
 
             if !localBranches.isEmpty {
                 Picker(
-                    String(localized: "worktree.picker.baseBranch", defaultValue: "Base branch"),
+                    "Base branch",
                     selection: Binding(
                         get: { selectedBaseBranch ?? "" },
                         set: { selectedBaseBranch = $0.isEmpty ? nil : $0 }
@@ -140,10 +168,10 @@ struct WorktreePickerView: View {
                         HStack {
                             Text(branch.name)
                             if branch.isCurrent {
-                                Text(String(localized: "worktree.picker.currentBranch", defaultValue: "(current)"))
+                                Text("(current)")
                                     .foregroundStyle(.secondary)
                             } else if branch.isInWorktree {
-                                Text(String(localized: "worktree.picker.inWorktree", defaultValue: "(in worktree)"))
+                                Text("(in worktree)")
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -161,7 +189,7 @@ struct WorktreePickerView: View {
                         ProgressView()
                             .scaleEffect(0.7)
                     }
-                    Text(String(localized: "worktree.picker.createAndOpen", defaultValue: "Create & Open"))
+                    Text("Create & Open")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -174,7 +202,7 @@ struct WorktreePickerView: View {
 
     private func loadData() async {
         guard let cwd = tabManager.tabs.first(where: { $0.id == tabManager.selectedTabId })?.currentDirectory else {
-            errorMessage = String(localized: "worktree.picker.noRepo", defaultValue: "No git repository found in current workspace")
+            errorMessage = "No git repository found in current workspace"
             isLoading = false
             return
         }
@@ -182,13 +210,15 @@ struct WorktreePickerView: View {
         let result: (root: String?, worktrees: [WorktreeEntry], branches: [GitWorktreeService.LocalBranch]) = await Task.detached {
             let root = GitWorktreeService.repoRoot(for: cwd)
             guard let root else { return (nil, [], []) }
+            GitWorktreeService.pruneWorktrees(repoRoot: root)
             let wts = GitWorktreeService.listWorktrees(repoRoot: root)
             let branches = GitWorktreeService.localBranches(repoRoot: root)
             return (root, wts, branches)
         }.value
 
         repoRoot = result.root
-        worktrees = result.worktrees
+        PendingWorktreeRemovals.pruneCompleted()
+        worktrees = result.worktrees.filter { !PendingWorktreeRemovals.contains($0.path) }
         localBranches = result.branches
         isLoading = false
 
@@ -203,7 +233,31 @@ struct WorktreePickerView: View {
         }
 
         if result.root == nil {
-            errorMessage = String(localized: "worktree.picker.noRepo", defaultValue: "No git repository found in current workspace")
+            errorMessage = "No git repository found in current workspace"
+        }
+    }
+
+    private func isMainWorktree(_ entry: WorktreeEntry) -> Bool {
+        if entry.isBare { return true }
+        // The first entry from `git worktree list` is always the main worktree
+        return worktrees.first?.id == entry.id
+    }
+
+    private func removeWorktree(_ entry: WorktreeEntry) {
+        guard let root = repoRoot else { return }
+
+        // Hide immediately, track as pending so it stays hidden across panel reopens
+        worktrees.removeAll { $0.id == entry.id }
+        PendingWorktreeRemovals.add(entry.path)
+
+        // If this worktree is open as a tab, close it properly (releases ports, cleans metadata)
+        if let openWorkspace = tabManager.tabs.first(where: { $0.worktreeMetadata?.worktreePath == entry.path }) {
+            tabManager.removeWorktreeWorkspace(openWorkspace)
+        } else {
+            let path = entry.path
+            Task.detached {
+                let _ = GitWorktreeService.removeWorktree(repoRoot: root, path: path, force: true)
+            }
         }
     }
 
@@ -263,11 +317,8 @@ private struct BranchNameField: View {
     @Binding var text: String
 
     var body: some View {
-        TextField(
-            String(localized: "worktree.picker.branchName", defaultValue: "New branch name"),
-            text: $text
-        )
-        .textFieldStyle(.roundedBorder)
-        .font(.body)
+        TextField("New branch name", text: $text)
+            .textFieldStyle(.roundedBorder)
+            .font(.body)
     }
 }

@@ -10742,8 +10742,6 @@ private struct TabItemView: View, Equatable {
         }
         .disabled(targetIds.isEmpty)
 
-        WorktreeContextMenuItems(workspace: tab)
-
         Divider()
 
         if let key = closeWorkspaceShortcut.keyEquivalent {

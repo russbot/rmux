@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Xcode doesn't inherit shell PATH — ensure Homebrew tools (zig) are available
+export PATH="/opt/homebrew/bin:$PATH"
+
 usage() {
   cat <<'EOF'
 Usage: ./scripts/build-ghostty-cli-helper.sh [--universal | --target <zig-target>] --output <path>

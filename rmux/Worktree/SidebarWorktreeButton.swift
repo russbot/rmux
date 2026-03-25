@@ -12,7 +12,7 @@ struct SidebarWorktreeButton: View {
                 .font(.system(size: 12))
         }
         .buttonStyle(.plain)
-        .help(String(localized: "sidebar.worktree.button.help", defaultValue: "New Worktree"))
+        .help("Worktrees")
         .popover(isPresented: $showWorktreePicker) {
             WorktreePickerView()
                 .environmentObject(tabManager)

@@ -38,7 +38,7 @@ extension TabManager {
 
     /// Removes a worktree-backed workspace: runs archive script if present,
     /// then removes the git worktree and closes the workspace.
-    func removeWorktreeWorkspace(_ workspace: Workspace, force: Bool = false) {
+    func removeWorktreeWorkspace(_ workspace: Workspace, force: Bool = true) {
         guard let metadata = workspace.worktreeMetadata else {
             closeWorkspace(workspace)
             return

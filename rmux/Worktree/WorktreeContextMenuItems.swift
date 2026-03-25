@@ -9,12 +9,12 @@ struct WorktreeContextMenuItems: View {
             Divider()
 
             if hasRunScript {
-                Button(String(localized: "contextMenu.worktree.runScript", defaultValue: "Run Script")) {
+                Button("Run Script") {
                     tabManager.runWorktreeScript(workspace)
                 }
             }
 
-            Button(String(localized: "contextMenu.worktree.remove", defaultValue: "Remove Worktree…")) {
+            Button("Remove Worktree…") {
                 tabManager.removeWorktreeWorkspace(workspace)
             }
         }
